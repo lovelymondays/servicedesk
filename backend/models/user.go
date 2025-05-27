@@ -75,7 +75,7 @@ func GetUserByID(id uint) (*User, error) {
 	err := DB.First(&user, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrUserNotFound
+			return nil, ErrUserNotFound 
 		}
 		return nil, err
 	}

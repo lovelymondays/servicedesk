@@ -128,7 +128,7 @@ export const useAuthStore = create((set) => ({
 
       if (error.response) {
         if (error.response.status === 401) {
-          errorMessage = "Invalid email or password";
+          errorMessage = "Invalid email or password from the frontend";
         } else if (error.response.status === 404) {
           errorMessage = "Login endpoint not found";
         } else if (error.response.status === 500) {

@@ -1,21 +1,20 @@
 package middleware
 
 import (
-	"errors" // For jwt.ErrTokenExpired etc.
+	"errors"
 	"fmt"
-	"log" // For server-side logging
+	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"supportdesk/models" // Ensure this path is correct
+	"supportdesk/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// getJWTSecret retrieves the JWT secret key.
 // IMPORTANT: This secret MUST be the same one used to SIGN the tokens.
 func getJWTSecret() []byte {
 	secret := os.Getenv("JWT_SECRET")
@@ -76,18 +75,18 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Extract user_id from claims
-		userIDFloat, ok := claims["user_id"].(float64) // JWT numbers are often float64
-		if !ok {
+		// Extract user_id from claims - check both possible claim keys
+		var userID uint
+		if userIDFloat, ok := claims["user_id"].(float64); ok {
+			userID = uint(userIDFloat)
+		} else if idFloat, ok := claims["id"].(float64); ok {
+			userID = uint(idFloat)
+		} else {
 			log.Printf("AuthMiddleware: user_id claim is missing or not a float64. Claims: %+v", claims)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token: 'user_id' claim issue"})
 			c.Abort()
 			return
 		}
-		userID := uint(userIDFloat)
-
-		// Get the user role from claims (optional, but can be useful for AdminOnly before DB hit)
-		// roleFromClaims, _ := claims["role"].(string)
 
 		// Get the user from the database to ensure they still exist and roles are current
 		user, err := models.GetUserByID(userID) // This now can return models.ErrUserNotFound
@@ -105,8 +104,8 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// Set user information in the context
-		c.Set("user_id", user.ID) // Used by controllers.GetCurrentUser
-		c.Set("role", user.Role)   // Used by AdminOnly middleware
+		c.Set("user_id", user.ID) // Used by controllers
+		c.Set("role", user.Role)   // Used by AdminOnly middleware and controllers
 
 		c.Next()
 	}
@@ -145,6 +144,7 @@ func AdminOnly() gin.HandlerFunc {
 func GenerateToken(user models.User) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
+		"id":      user.ID,   // Keep both for compatibility
 		"role":    user.Role, // Good to include for quick checks, though AuthMiddleware re-verifies from DB
 		"exp":     time.Now().Add(time.Hour * 24).Unix(),
 		"iat":     time.Now().Unix(), // Issued At

@@ -18,7 +18,6 @@ func main() {
 	// Initialize database
 	config.InitDB()
 
-
 	// Create Gin router
 	r := gin.Default()
 
@@ -30,28 +29,20 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-
 	// Public routes
 	r.POST("/api/auth/login", controllers.Login)
 
-	// Protected routes
+	// Protected routes - all require authentication
 	api := r.Group("/api")
 	api.Use(middleware.AuthMiddleware())
 	{
 		// User routes
-		// api.GET("/user", middleware.AuthMiddleware(), controllers.GetCurrentUser)
 		api.GET("/user", controllers.GetCurrentUser)
-
-
-		// Category routes
-		api.GET("/categories", controllers.GetCategories)
-		api.POST("/categories", middleware.AdminOnly(), controllers.CreateCategory)
-		api.DELETE("/categories/:id", middleware.AdminOnly(), controllers.DeleteCategory)
 
 		// Dashboard routes
 		dashboard := api.Group("/dashboard")
 		{
-			// Read-only routes for all authenticated users
+			// Read-only routes for all authenticated users (approved tasks only)
 			dashboard.GET("/user-guidance", controllers.GetTasks)
 			dashboard.GET("/user-guidance/:id", controllers.GetTask)
 			dashboard.GET("/password-reset", controllers.GetTasks)
@@ -65,39 +56,48 @@ func main() {
 			dashboard.GET("/sla-monitoring", controllers.GetTasks)
 			dashboard.GET("/sla-monitoring/:id", controllers.GetTask)
 
-			// Admin-only routes for content management
+			// Task creation - available to all authenticated users (creates pending tasks)
+			dashboard.POST("/user-guidance", controllers.CreateTask)
+			dashboard.POST("/password-reset", controllers.CreateTask)
+			dashboard.POST("/incident-solving", controllers.CreateTask)
+			dashboard.POST("/request-solving", controllers.CreateTask)
+			dashboard.POST("/faq", controllers.CreateTask)
+			dashboard.POST("/sla-monitoring", controllers.CreateTask)
+
+			// Admin-only routes for task management
 			admin := dashboard.Group("")
 			admin.Use(middleware.AdminOnly())
 			{
-				// User Guidance
-				admin.POST("/user-guidance", controllers.CreateTask)
+				// Task editing and deletion (admin only)
 				admin.PUT("/user-guidance/:id", controllers.UpdateTask)
 				admin.DELETE("/user-guidance/:id", controllers.DeleteTask)
-
-				// Password Reset
-				admin.POST("/password-reset", controllers.CreateTask)
 				admin.PUT("/password-reset/:id", controllers.UpdateTask)
 				admin.DELETE("/password-reset/:id", controllers.DeleteTask)
-
-				// Incident Solving
-				admin.POST("/incident-solving", controllers.CreateTask)
 				admin.PUT("/incident-solving/:id", controllers.UpdateTask)
 				admin.DELETE("/incident-solving/:id", controllers.DeleteTask)
-
-				// Request Solving
-				admin.POST("/request-solving", controllers.CreateTask)
 				admin.PUT("/request-solving/:id", controllers.UpdateTask)
 				admin.DELETE("/request-solving/:id", controllers.DeleteTask)
-
-				// FAQ
-				admin.POST("/faq", controllers.CreateTask)
 				admin.PUT("/faq/:id", controllers.UpdateTask)
 				admin.DELETE("/faq/:id", controllers.DeleteTask)
-
-				// SLA Monitoring
-				admin.POST("/sla-monitoring", controllers.CreateTask)
 				admin.PUT("/sla-monitoring/:id", controllers.UpdateTask)
 				admin.DELETE("/sla-monitoring/:id", controllers.DeleteTask)
+
+				// Admin approval/rejection routes
+				admin.PUT("/user-guidance/:id/approve", controllers.ApproveTask)
+				admin.PUT("/user-guidance/:id/reject", controllers.RejectTask)
+				admin.PUT("/password-reset/:id/approve", controllers.ApproveTask)
+				admin.PUT("/password-reset/:id/reject", controllers.RejectTask)
+				admin.PUT("/incident-solving/:id/approve", controllers.ApproveTask)
+				admin.PUT("/incident-solving/:id/reject", controllers.RejectTask)
+				admin.PUT("/request-solving/:id/approve", controllers.ApproveTask)
+				admin.PUT("/request-solving/:id/reject", controllers.RejectTask)
+				admin.PUT("/faq/:id/approve", controllers.ApproveTask)
+				admin.PUT("/faq/:id/reject", controllers.RejectTask)
+				admin.PUT("/sla-monitoring/:id/approve", controllers.ApproveTask)
+				admin.PUT("/sla-monitoring/:id/reject", controllers.RejectTask)
+
+				// Admin route to view all tasks (including pending ones)
+				admin.GET("/pending-tasks", controllers.GetPendingTasks)
 			}
 		}
 	}

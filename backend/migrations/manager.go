@@ -113,7 +113,7 @@ func SeedDatabase(db *gorm.DB) error {
 
 		// Get admin user for creating tasks
 		var admin User
-		if err := db.Where("email = ?", "admin@supportdeskk.com").First(&admin).Error; err != nil {
+		if err := db.Where("email = ?", "admin@supportdesk.com").First(&admin).Error; err != nil {
 			return err
 		}
 

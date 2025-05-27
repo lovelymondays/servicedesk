@@ -25,6 +25,10 @@ export const useTaskStore = create((set) => ({
   loading: false,
   error: null,
 
+  // Clear error when needed
+  clearError: () => set({ error: null }),
+
+  // Get tasks for a specific category
   getTasks: async (category) => {
     set({ loading: true, error: null });
     try {
@@ -38,26 +42,10 @@ export const useTaskStore = create((set) => ({
     }
   },
 
-  getTask: async (category, id) => {
-    set({ loading: true, error: null });
-    try {
-      const response = await axios.get(
-        `${API_URL}/dashboard/${category}/${id}`
-      );
-      return response.data;
-    } catch (error) {
-      set({
-        error: error.response?.data?.error || "Failed to fetch task",
-        loading: false,
-      });
-      return null;
-    }
-  },
-
+  // Create a new task (available to all users, admin tasks auto-approved)
   createTask: async (category, taskData) => {
     set({ loading: true, error: null });
     try {
-      // Get the token
       const token = localStorage.getItem("token");
       if (!token) {
         set({
@@ -67,12 +55,9 @@ export const useTaskStore = create((set) => ({
         return null;
       }
 
-      // Ensure Authorization header is set
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
       const response = await axios.post(`${API_URL}/dashboard/${category}`, {
         ...taskData,
-        status: "pending", // New tasks start as pending for admin approval
+        category: category,
       });
 
       // Update the tasks list with the new task
@@ -90,7 +75,6 @@ export const useTaskStore = create((set) => ({
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = "Please log in to create tasks";
-          // Clear invalid token
           localStorage.removeItem("token");
           delete axios.defaults.headers.common["Authorization"];
         } else if (error.response.data?.error) {
@@ -108,157 +92,177 @@ export const useTaskStore = create((set) => ({
     }
   },
 
+  // Update a task (admin only)
   updateTask: async (category, id, taskData) => {
     set({ loading: true, error: null });
     try {
-      // Ensure all required fields are present
       const payload = {
         ...taskData,
-        category: category, // Ensure category is set
-        type: taskData.type || "Q&A", // Ensure type has a default
-        status: taskData.status || "pending", // Ensure status has a default
+        category: category,
+        type: taskData.type || "Q&A",
       };
 
       const response = await axios.put(
         `${API_URL}/dashboard/${category}/${id}`,
         payload
       );
+
       set((state) => ({
         tasks: state.tasks.map((task) =>
-          task.id === id ? response.data : task
+          task.id === parseInt(id) ? response.data : task
         ),
         loading: false,
       }));
+
       return response.data;
     } catch (error) {
+      let errorMessage = "Failed to update task";
+      if (error.response?.status === 403) {
+        errorMessage = "Access denied: Admin privileges required";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+
       set({
-        error: error.response?.data?.error || "Failed to update task",
+        error: errorMessage,
         loading: false,
       });
       return null;
     }
   },
 
+  // Delete a task (admin only)
   deleteTask: async (category, id) => {
     set({ loading: true, error: null });
     try {
       await axios.delete(`${API_URL}/dashboard/${category}/${id}`);
       set((state) => ({
-        tasks: state.tasks.filter((task) => task.id !== id),
+        tasks: state.tasks.filter((task) => task.id !== parseInt(id)),
         loading: false,
       }));
       return true;
     } catch (error) {
+      let errorMessage = "Failed to delete task";
+      if (error.response?.status === 403) {
+        errorMessage = "Access denied: Admin privileges required";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+
       set({
-        error: error.response?.data?.error || "Failed to delete task",
+        error: errorMessage,
         loading: false,
       });
       return false;
     }
   },
 
-  addCategory: async (categoryData) => {
+  // Get all pending tasks (admin only)
+  getPendingTasks: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await axios.post(`${API_URL}/categories`, categoryData);
-      set((state) => ({
-        categories: [...state.categories, response.data],
-        loading: false,
-      }));
-      return response.data;
+      const response = await axios.get(`${API_URL}/dashboard/pending-tasks`);
+      set({ tasks: response.data, loading: false });
     } catch (error) {
+      let errorMessage = "Failed to fetch pending tasks";
+      if (error.response?.status === 403) {
+        errorMessage = "Access denied: Admin privileges required";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+
       set({
-        error: error.response?.data?.error || "Failed to add category",
+        error: errorMessage,
         loading: false,
       });
-      return null;
     }
   },
 
-  deleteCategory: async (categoryId) => {
-    set({ loading: true, error: null });
-    try {
-      await axios.delete(`${API_URL}/categories/${categoryId}`);
-      set((state) => ({
-        categories: state.categories.filter((cat) => cat.id !== categoryId),
-        loading: false,
-      }));
-      return true;
-    } catch (error) {
-      set({
-        error: error.response?.data?.error || "Failed to delete category",
-        loading: false,
-      });
-      return false;
-    }
-  },
-
+  // Approve a pending task (admin only)
   approveTask: async (category, id) => {
     set({ loading: true, error: null });
     try {
       const response = await axios.put(
-        `${API_URL}/dashboard/${category}/${id}/approve`,
-        { status: "approved" }
+        `${API_URL}/dashboard/${category}/${id}/approve`
       );
+
       set((state) => ({
         tasks: state.tasks.map((task) =>
-          task.id === id ? response.data : task
+          task.id === parseInt(id) ? { ...task, status: "approved" } : task
         ),
         loading: false,
       }));
+
       return response.data;
     } catch (error) {
+      let errorMessage = "Failed to approve task";
+      if (error.response?.status === 403) {
+        errorMessage = "Access denied: Admin privileges required";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+
       set({
-        error: error.response?.data?.error || "Failed to approve task",
+        error: errorMessage,
         loading: false,
       });
       return null;
     }
   },
 
-  rejectTask: async (category, id, reason) => {
+  // Reject a pending task (admin only)
+  rejectTask: async (category, id, reason = "") => {
     set({ loading: true, error: null });
     try {
       const response = await axios.put(
         `${API_URL}/dashboard/${category}/${id}/reject`,
-        { status: "rejected", reason }
+        { reason }
       );
+
       set((state) => ({
         tasks: state.tasks.map((task) =>
-          task.id === id ? response.data : task
+          task.id === parseInt(id) ? { ...task, status: "rejected" } : task
         ),
         loading: false,
       }));
+
       return response.data;
     } catch (error) {
+      let errorMessage = "Failed to reject task";
+      if (error.response?.status === 403) {
+        errorMessage = "Access denied: Admin privileges required";
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+
       set({
-        error: error.response?.data?.error || "Failed to reject task",
+        error: errorMessage,
         loading: false,
       });
       return null;
     }
   },
 
-  rateTask: async (category, id, rating) => {
-    set({ loading: true, error: null });
-    try {
-      const response = await axios.post(
-        `${API_URL}/dashboard/${category}/${id}/rate`,
-        { rating }
-      );
-      set((state) => ({
-        tasks: state.tasks.map((task) =>
-          task.id === id ? { ...task, rating: response.data.rating } : task
-        ),
-        loading: false,
-      }));
-      return response.data;
-    } catch (error) {
-      set({
-        error: error.response?.data?.error || "Failed to rate task",
-        loading: false,
-      });
-      return null;
-    }
-  },
+  // rateTask: async (category, id, rating) => {
+  //   set({ loading: true, error: null });
+  //   try {
+  //     const response = await axios.post(
+  //       `${API_URL}/dashboard/${category}/${id}/rate`,
+  //       { rating }
+  //     );
+  //     set((state) => ({
+  //       tasks: state.tasks.map((task) =>
+  //         task.id === id ? { ...task, rating: response.data.rating } : task
+  //       ),
+  //       loading: false,
+  //     }));
+  //     return response.data;
+  //   } catch (error) {
+  //     set({
+  //       error: error.response?.data?.error || "Failed to rate task",
+  //       loading: false,
+  //     });
+  //     return null;
+  //   }
+  // },
 }));
