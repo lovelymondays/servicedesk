@@ -16,7 +16,7 @@ func InitAdminUser() {
 			Email: "admin@supportdesk.com",
 			Role:  "admin",
 		}
-		adminUser.SetPassword("admin123") // Change this in production
+		adminUser.SetPassword("admin1234") // Change this in production
 		if err := models.DB.Create(&adminUser).Error; err != nil {
 			log.Printf("Failed to create admin user: %v", err)
 			return

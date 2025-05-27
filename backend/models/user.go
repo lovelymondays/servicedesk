@@ -67,18 +67,7 @@ func (u *User) CheckPassword(password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
 }
 
-// GetUserByEmail retrieves a user by their email address
-func GetUserByEmail(email string) (*User, error) {
-	var user User
-	err := DB.Where("email = ?", email).First(&user).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("user not found")
-		}
-		return nil, err
-	}
-	return &user, nil
-}
+var ErrUserNotFound = errors.New("user not found")
 
 // GetUserByID retrieves a user by their ID
 func GetUserByID(id uint) (*User, error) {
@@ -86,12 +75,26 @@ func GetUserByID(id uint) (*User, error) {
 	err := DB.First(&user, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("user not found")
+			return nil, ErrUserNotFound
 		}
 		return nil, err
 	}
 	return &user, nil
 }
+
+// GetUserByEmail (you likely have this too, good to be consistent)
+func GetUserByEmail(email string) (*User, error) {
+	var user User
+	err := DB.Where("email = ?", email).First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound // Use your custom error here too
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
 
 // CreateUser creates a new user in the database
 func CreateUser(email, password, role string) (*User, error) {
@@ -124,46 +127,5 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// InitializeDefaultUsers creates default users if they don't exist
-func InitializeDefaultUsers() error {
-	// Create admin user if it doesn't exist
-	var adminUser User
-	if err := DB.Where("email = ?", "admin@supportdesk.com").First(&adminUser).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Println("Creating default admin user...")
-			if _, err := CreateUser("admin@supportdesk.com", "admin123", "admin"); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
 
-	// Create default users if they don't exist
-	defaultUsers := []struct {
-		email    string
-		password string
-		role     string
-	}{
-		{"john.doe@company.com", "user123", "user"},
-		{"sarah.smith@company.com", "user123", "user"},
-		{"tech.support@company.com", "admin123", "admin"},
-		{"help.desk@company.com", "admin123", "admin"},
-	}
 
-	for _, u := range defaultUsers {
-		var user User
-		if err := DB.Where("email = ?", u.email).First(&user).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				log.Printf("Creating default user: %s", u.email)
-				if _, err := CreateUser(u.email, u.password, u.role); err != nil {
-					return err
-				}
-			} else {
-				return err
-			}
-		}
-	}
-
-	return nil
-}

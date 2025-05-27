@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"supportdesk/models"
+	"supportdesk/models" // Assuming models.User and database functions are here
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -47,7 +47,6 @@ func Login(c *gin.Context) {
 		"exp":     time.Now().Add(time.Hour * 24).Unix(), // Token expires in 24 hours
 	})
 
-	// Get the secret key from environment variable or use a default for development
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		secret = "your-256-bit-secret" // Change this in production
@@ -60,15 +59,15 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Login successful for user: %s with role: %s", user.Email, user.Role)
+	log.Printf("Login successful for user: %s with role: %s", user.Email, user.Role) // Good for backend debugging
 
 	c.JSON(http.StatusOK, gin.H{
-		"token": tokenString,
-		"user": gin.H{
-			"id":    user.ID,
-			"email": user.Email,
-			"role":  user.Role,
-		},
+		 "token": tokenString,
+		 "user": gin.H{ // This 'user' object is sent to the frontend
+			  "user_id":    user.ID,
+			  "email": user.Email,
+			  "role":  user.Role, // CRITICAL: Ensure user.Role is correct from the database
+		 },
 	})
 }
 
@@ -85,14 +84,12 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// Check if user already exists
 	if _, err := models.GetUserByEmail(input.Email); err == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already registered"})
 		return
 	}
 
-	// Create new user
-	user, err := models.CreateUser(input.Email, input.Password, "user")
+	user, err := models.CreateUser(input.Email, input.Password, "user") // Default role "user"
 	if err != nil {
 		log.Printf("Register: Failed to create user: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
@@ -101,33 +98,41 @@ func Register(c *gin.Context) {
 
 	log.Printf("New user registered: %s with role: %s", user.Email, user.Role)
 
+
 	c.JSON(http.StatusCreated, gin.H{
 		"user": gin.H{
-			"id":    user.ID,
+			"user_id":    user.ID,
 			"email": user.Email,
 			"role":  user.Role,
 		},
 	})
 }
 
-// GetCurrentUser returns the current authenticated user
 func GetCurrentUser(c *gin.Context) {
-	userID, exists := c.Get("user_id")
+	userIDInterface, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		log.Println("GetCurrentUser: user_id not found in context. AuthMiddleware might not have run or failed.")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context (no user_id)"})
 		return
 	}
 
-	user, err := models.GetUserByID(userID.(uint))
+	userID, ok := userIDInterface.(uint)
+	if !ok {
+		log.Printf("GetCurrentUser: user_id in context is not of type uint. Actual type: %T", userIDInterface)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error processing user identity"})
+		return
+	}
+
+	user, err := models.GetUserByID(userID) 
 	if err != nil {
-		log.Printf("GetCurrentUser: Failed to get user by ID %v: %v", userID, err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user details"})
+		log.Printf("GetCurrentUser: Failed to get user by ID %d: %v", userID, err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to get user details"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":    user.ID,
+		"user_id":    user.ID,
 		"email": user.Email,
 		"role":  user.Role,
 	})
-} 
+}

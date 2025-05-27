@@ -12,19 +12,12 @@ import (
 	"supportdesk/config"
 	"supportdesk/controllers"
 	"supportdesk/middleware"
-	"supportdesk/models"
 )
 
 func main() {
 	// Initialize database
 	config.InitDB()
 
-	// Initialize default users
-	if err := models.InitializeDefaultUsers(); err != nil {
-		log.Printf("Warning: Failed to initialize default users: %v", err)
-	} else {
-		log.Println("Default users initialized successfully")
-	}
 
 	// Create Gin router
 	r := gin.Default()
@@ -37,17 +30,18 @@ func main() {
 		AllowCredentials: true,
 	}))
 
+
 	// Public routes
 	r.POST("/api/auth/login", controllers.Login)
-	r.POST("/api/auth/register", controllers.Register)
 
 	// Protected routes
 	api := r.Group("/api")
 	api.Use(middleware.AuthMiddleware())
 	{
 		// User routes
+		// api.GET("/user", middleware.AuthMiddleware(), controllers.GetCurrentUser)
 		api.GET("/user", controllers.GetCurrentUser)
-		api.GET("/users", middleware.AdminOnly(), controllers.GetUsers)
+
 
 		// Category routes
 		api.GET("/categories", controllers.GetCategories)

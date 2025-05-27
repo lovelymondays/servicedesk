@@ -90,15 +90,14 @@ func AuthMiddleware() gin.HandlerFunc {
 		// roleFromClaims, _ := claims["role"].(string)
 
 		// Get the user from the database to ensure they still exist and roles are current
-		user, err := models.GetUserByID(userID) // This now can return models.ErrUserNotFound
+		user, err := models.GetUserByID(userID)
 		if err != nil {
 			log.Printf("AuthMiddleware: Failed to get user by ID %d from DB: %v", userID, err)
-			
-			if errors.Is(err, models.ErrUserNotFound) { // Check for your custom error
+			// Differentiate between "user not found" and other DB errors if possible
+			if errors.Is(err, models.ErrUserNotFound) { // Assuming your models define such an error
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token: User associated with this token not found"})
 			} else {
-				// For any other database error (connection issue, query problem, etc.)
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token: Error validating user with database"})
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token: Error validating user"})
 			}
 			c.Abort()
 			return
@@ -107,6 +106,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Set user information in the context
 		c.Set("user_id", user.ID) // Used by controllers.GetCurrentUser
 		c.Set("role", user.Role)   // Used by AdminOnly middleware
+		// c.Set("user", user) // You can set the full user object if other handlers need it
 
 		c.Next()
 	}

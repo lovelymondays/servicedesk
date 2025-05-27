@@ -27,14 +27,6 @@ export default function Login() {
       return;
     }
 
-    // Default admin credentials
-    if (
-      formData.email === "admin@supportdesk.com" &&
-      formData.password === "admin123"
-    ) {
-      console.log("Using default admin credentials");
-    }
-
     try {
       const success = await login(formData.email, formData.password);
       if (success) {

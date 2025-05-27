@@ -36,25 +36,61 @@ export const useAuthStore = create((set) => ({
 
   login: async (email, password) => {
     set({ loading: true, error: null });
+
+    // Debug logging
+    console.log("Login attempt:", { email, password: "***" });
+    console.log("Login URL:", `${API_URL}/auth/login`);
+
     try {
       const response = await axios.post(
         `${API_URL}/auth/login`,
         {
-          email,
-          password,
+          email: email.trim(),
+          password: password,
         },
         {
           headers: {
             "Content-Type": "application/json",
           },
+          timeout: 10000, // 10 second timeout
         }
       );
+
+      console.log("Login response:", response.data);
 
       if (!response.data || !response.data.token) {
         throw new Error("Invalid response from server");
       }
 
       const { token, user } = response.data;
+
+      console.log("Backend login response:", response.data);
+      console.log("User object from login response:", user); // Should show { id: ..., email: ..., role: '...' }
+      console.log("Role from login response user object:", user?.role);
+
+      if (
+        !response.data ||
+        !response.data.token ||
+        !user ||
+        typeof user.role === "undefined"
+      ) {
+        let errorMsg = "Invalid response from server";
+        if (!user || typeof user.role === "undefined") {
+          errorMsg =
+            "Login successful, but user data (especially role) is incomplete from server.";
+          console.error(errorMsg, "Received user object:", user);
+        } else if (!response.data.token) {
+          errorMsg = "Invalid response from server: Missing token.";
+        }
+        set({
+          user: null,
+          isAuthenticated: false,
+          error: errorMsg,
+          loading: false,
+        });
+
+        return false;
+      }
 
       // Store token and update axios default headers
       localStorage.setItem("token", token);
@@ -67,19 +103,46 @@ export const useAuthStore = create((set) => ({
         error: null,
       });
 
+      setTimeout(() => {
+        // Use setTimeout to ensure state update has propagated
+        const isAdminNow = useAuthStore.getState().isAdmin();
+        console.log(
+          "isAdmin() check shortly after login set state:",
+          isAdminNow,
+          "User in store:",
+          useAuthStore.getState().user
+        );
+      }, 0);
+
       return true;
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Login error details:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url,
+        data: error.config?.data,
+      });
+
       let errorMessage = "Failed to login";
 
       if (error.response) {
         if (error.response.status === 401) {
           errorMessage = "Invalid email or password";
+        } else if (error.response.status === 404) {
+          errorMessage = "Login endpoint not found";
+        } else if (error.response.status === 500) {
+          errorMessage = "Server error. Please try again.";
         } else if (error.response.data?.error) {
           errorMessage = error.response.data.error;
+        } else if (error.response.data?.message) {
+          errorMessage = error.response.data.message;
         }
       } else if (error.request) {
-        errorMessage = "No response from server";
+        errorMessage =
+          "No response from server. Please check if the server is running.";
+      } else if (error.code === "ECONNABORTED") {
+        errorMessage = "Request timeout. Please try again.";
       }
 
       set({

@@ -16,7 +16,7 @@ A task management system for support teams with user authentication and category
 
    ```bash
    docker-compose up -d
-   ```
+   ````
 
 2. The database will be initialized with the schema from `backend/scripts/init_db.sql`
 

@@ -50,7 +50,7 @@ func CreateTask(c *gin.Context) {
 	}
 
 	// Get the authenticated user's ID from the context
-	userID, exists := c.Get("user_id")
+	userID, exists := c.Get(" ")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return

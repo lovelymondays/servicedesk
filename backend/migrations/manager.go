@@ -4,6 +4,7 @@ import (
 	"log"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -15,6 +16,15 @@ var ValidCategories = []string{
 	"request-solving",
 	"faq",
 	"sla-monitoring",
+}
+
+// hashPassword creates a bcrypt hash of the password
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
 
 // RunMigrations runs all database migrations in order
@@ -55,31 +65,42 @@ func SeedDatabase(db *gorm.DB) error {
 	if userCount == 0 {
 		log.Println("Seeding database with initial data...")
 
-		// Create users
+		// Hash passwords
+		adminPassword, err := hashPassword("admin123")
+		if err != nil {
+			return err
+		}
+
+		userPassword, err := hashPassword("user123")
+		if err != nil {
+			return err
+		}
+
+		// Create users with correct passwords
 		users := []User{
 			{
 				Email:    "admin@supportdesk.com",
-				Password: "$2a$10$ZGqFWuJzYYvYXNLzSWYMpOGx8hD5ARgYEuWZD4hGWZzEFNKhZnqeO", // admin123
+				Password: adminPassword,
 				Role:     "admin",
 			},
 			{
 				Email:    "john.doe@company.com",
-				Password: "$2a$10$ZGqFWuJzYYvYXNLzSWYMpOGx8hD5ARgYEuWZD4hGWZzEFNKhZnqeO", // admin123
+				Password: userPassword, // Changed to user123
 				Role:     "user",
 			},
 			{
 				Email:    "sarah.smith@company.com",
-				Password: "$2a$10$ZGqFWuJzYYvYXNLzSWYMpOGx8hD5ARgYEuWZD4hGWZzEFNKhZnqeO", // admin123
+				Password: userPassword, // Changed to user123
 				Role:     "user",
 			},
 			{
 				Email:    "tech.support@company.com",
-				Password: "$2a$10$ZGqFWuJzYYvYXNLzSWYMpOGx8hD5ARgYEuWZD4hGWZzEFNKhZnqeO", // admin123
+				Password: adminPassword,
 				Role:     "admin",
 			},
 			{
 				Email:    "help.desk@company.com",
-				Password: "$2a$10$ZGqFWuJzYYvYXNLzSWYMpOGx8hD5ARgYEuWZD4hGWZzEFNKhZnqeO", // admin123
+				Password: adminPassword,
 				Role:     "admin",
 			},
 		}
@@ -92,7 +113,7 @@ func SeedDatabase(db *gorm.DB) error {
 
 		// Get admin user for creating tasks
 		var admin User
-		if err := db.Where("email = ?", "admin@supportdesk.com").First(&admin).Error; err != nil {
+		if err := db.Where("email = ?", "admin@supportdeskk.com").First(&admin).Error; err != nil {
 			return err
 		}
 
@@ -457,4 +478,4 @@ func SeedDatabase(db *gorm.DB) error {
 	}
 
 	return nil
-} 
+}
